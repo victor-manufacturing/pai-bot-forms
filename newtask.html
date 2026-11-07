@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>New task</title>
+<script>
+  // Read the bot's lists from the #fragment before anything else can change it. The fragment never reaches the web server.
+  window.__RAW_HASH = location.hash || "";
+</script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #1c1c1e);
+    --hint: var(--tg-theme-hint-color, #8a8a8e);
+    --link: var(--tg-theme-link-color, #2481cc);
+    --btn: var(--tg-theme-button-color, #2481cc);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --section: var(--tg-theme-section-bg-color, var(--tg-theme-secondary-bg-color, #f2f2f7));
+    --field: var(--tg-theme-secondary-bg-color, #f2f2f7);
+    --sep: var(--tg-theme-section-separator-color, rgba(128,128,128,.25));
+    --danger: var(--tg-theme-destructive-text-color, #e53935);
+    --warn: #b26a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.tg) {
+      --bg: #17212b; --text: #f5f5f5; --hint: #8c9aa8; --link: #62bcf9; --btn: #5288c1;
+      --section: #232e3c; --field: #1c2733; --sep: rgba(255,255,255,.12);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+  main { padding: 12px 16px 96px; max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 4px 0 12px; }
+  .section { background: var(--section); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  label.title, .label { display: block; font-size: 13px; font-weight: 600; color: var(--hint);
+    text-transform: uppercase; letter-spacing: .03em; margin-bottom: 6px; }
+  .req { color: var(--danger); }
+  input[type=text], input[type=date], select {
+    width: 100%; font: inherit; color: var(--text); background: var(--field);
+    border: 1px solid var(--sep); border-radius: 10px; padding: 10px 12px; min-height: 44px; outline: none; }
+  input:focus, select:focus { border-color: var(--btn); }
+  input.bad { border-color: var(--danger); }
+  .err { color: var(--danger); font-size: 13px; margin-top: 6px; display: none; }
+  .err.show { display: block; }
+  .note { color: var(--hint); font-size: 13px; margin-top: 6px; }
+  .warn { color: var(--warn); font-size: 13px; margin-top: 6px; }
+  @media (prefers-color-scheme: dark) { .warn { color: #ffb74d; } }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chips:empty { display: none; }
+  .chip { font: inherit; font-size: 14px; border: 1px solid var(--sep); background: var(--field); color: var(--text);
+    border-radius: 16px; padding: 6px 12px; min-height: 34px; cursor: pointer; }
+  .chip.on { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .seg .chip { border-radius: 10px; padding: 8px 2px; font-size: 13px; white-space: nowrap; }
+  .row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+  .row select { flex: 0 0 38%; }
+  .row input { flex: 1; min-width: 0; }
+  .x { flex: 0 0 40px; height: 44px; border-radius: 10px; border: 1px solid var(--sep); background: var(--field);
+    color: var(--hint); font-size: 18px; cursor: pointer; }
+  .link { background: none; border: none; color: var(--link); font: inherit; padding: 8px 0 0; cursor: pointer; }
+  .check { display: flex; gap: 10px; align-items: center; min-height: 44px; }
+  .check input { width: 22px; height: 22px; accent-color: var(--btn); }
+  .check.off { color: var(--hint); }
+  .found { font-size: 13px; margin-top: 6px; color: var(--text); }
+  #fallback { display: none; width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: var(--btn);
+    color: var(--btn-text); font: inherit; font-weight: 600; margin-top: 4px; }
+  #debug { white-space: pre-wrap; font-size: 12px; color: var(--hint); }
+  #banner { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>New task</h1>
+  <div id="banner" class="section note"></div>
+
+  <div class="section">
+    <label class="title" for="title">Task name <span class="req">*</span></label>
+    <input id="title" type="text" maxlength="200" autocomplete="off" placeholder="e.g. Moi Food INV/DO invdo-I-000446">
+    <div id="title-found" class="found"></div>
+    <div id="title-err" class="err"></div>
+  </div>
+
+  <div class="section">
+    <span class="label">Type</span>
+    <div id="types" class="chips"></div>
+    <input id="kind-own" type="text" maxlength="20" autocomplete="off" autocapitalize="off" placeholder="Your own type, e.g. onsite" style="display:none; margin-top:8px">
+    <div id="kind-err" class="err"></div>
+  </div>
+
+  <div class="section">
+    <label class="title" for="customer">Customer</label>
+    <input id="customer" type="text" maxlength="31" autocomplete="off" autocapitalize="off" placeholder="One word, e.g. upeca">
+    <div id="customer-chips" class="chips"></div>
+    <div id="customer-err" class="err"></div>
+  </div>
+
+  <div class="section">
+    <label class="title" for="person">Person</label>
+    <input id="person" type="text" maxlength="31" autocomplete="off" autocapitalize="off" placeholder="One word, e.g. jane">
+    <div id="person-chips" class="chips"></div>
+    <div id="person-err" class="err"></div>
+    <label id="wait-row" class="check off" style="margin-top:6px">
+      <input id="wait" type="checkbox" disabled>
+      <span id="wait-label">Already waiting on this person</span>
+    </label>
+  </div>
+
+  <div class="section">
+    <label class="title" for="due">Due date</label>
+    <input id="due" type="date">
+    <div class="chips">
+      <button type="button" class="chip" data-due="today">Today</button>
+      <button type="button" class="chip" data-due="next">Next workday</button>
+      <button type="button" class="chip" data-due="mon">Next Mon</button>
+      <button type="button" class="chip" data-due="clear">No date</button>
+    </div>
+    <div id="due-warn" class="warn"></div>
+    <div id="due-err" class="err"></div>
+  </div>
+
+  <div class="section">
+    <span class="label">Priority</span>
+    <div class="seg" id="prio">
+      <button type="button" class="chip" data-prio="urgent">🔴 Urgent</button>
+      <button type="button" class="chip" data-prio="high">🟠 High</button>
+      <button type="button" class="chip on" data-prio="normal">⚪ Normal</button>
+      <button type="button" class="chip" data-prio="low">🔵 Low</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="label">Documents</span>
+    <div id="docs"></div>
+    <button type="button" class="link" id="add-doc">+ Add document</button>
+    <div class="note">Or type vqt-0001, po-IM0001, invdo-I-000446 in the name. End with ' to keep it in the name too.</div>
+    <div id="docs-err" class="err"></div>
+  </div>
+
+  <div id="form-err" class="err"></div>
+  <button type="button" id="fallback">Save task</button>
+  <div id="debug"></div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var tg = window.Telegram && window.Telegram.WebApp;
+  var inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- data from the bot (URL #fragment, base64url JSON) ----------
+  function readContext() {
+    var raw = "";
+    window.__RAW_HASH.replace(/^#/, "").split("&").forEach(function (part) {
+      if (part.indexOf("d=") === 0) raw = part.slice(2);
+    });
+    if (!raw && tg && window.Telegram.WebView && window.Telegram.WebView.initParams) raw = window.Telegram.WebView.initParams.d || "";
+    if (!raw) return null;
+    try {
+      var b64 = raw.replace(/-/g, "+").replace(/_/g, "/");
+      while (b64.length % 4) b64 += "=";
+      var bin = atob(b64), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var ctx = JSON.parse(new TextDecoder("utf-8").decode(bytes));
+      return ctx && ctx.v === 1 ? ctx : null;
+    } catch (e) { return null; }
+  }
+  var CTX = readContext();
+  var KINDS = ["quote", "invdo", "calibration", "supplier", "payment", "general"];
+  var types = (CTX && Array.isArray(CTX.types) ? CTX.types : KINDS).filter(function (t) { return typeof t === "string"; });
+  var customers = CTX && Array.isArray(CTX.customers) ? CTX.customers : [];
+  var people = CTX && Array.isArray(CTX.people) ? CTX.people : [];
+  var holidays = CTX && CTX.hol && typeof CTX.hol === "object" ? CTX.hol : {};
+  if (!CTX) {
+    $("banner").style.display = "block";
+    $("banner").textContent = "Suggestions and holidays didn't load. You can still add the task; send /form in the chat for a fresh button.";
+  }
+
+  // ---------- dates (ISO strings, worked out in UTC so the phone's time zone can't shift them) ----------
+  function iso(d) { return d.toISOString().slice(0, 10); }
+  function parseIso(s) { return new Date(s + "T00:00:00Z"); }
+  function addDays(s, n) { var d = parseIso(s); d.setUTCDate(d.getUTCDate() + n); return iso(d); }
+  function weekday(s) { return (parseIso(s).getUTCDay() + 6) % 7; }  // Mon = 0 ... Sun = 6, like Python
+  function isWorkday(s) { return weekday(s) < 5 && !holidays[s]; }
+  function nextWorkday(s) { var d = addDays(s, 1); while (!isWorkday(d)) d = addDays(d, 1); return d; }
+  var DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var DAYLONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function nice(s) { var d = parseIso(s); return DAY[weekday(s)] + " " + d.getUTCDate() + " " + MON[d.getUTCMonth()]; }
+  var phoneToday = "";
+  try { phoneToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date()); } catch (e) {}
+  var botToday = CTX && /^\d{4}-\d{2}-\d{2}$/.test(CTX.today || "") ? CTX.today : "";
+  var TODAY = [botToday, phoneToday].filter(function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x); }).sort().pop() || iso(new Date());
+
+  // ---------- documents (same rules as the bot) ----------
+  var DOC_TYPES = { quotation: "Quotation", po: "PO", invdo: "INV/DO", other: "Other" };
+  var DOC_OF_PREFIX = { vqt: "quotation", invdo: "invdo", po: "po" };
+  function rstrip(s, chars) { while (s && chars.indexOf(s.slice(-1)) >= 0) s = s.slice(0, -1); return s; }
+  function docToken(word) {
+    var m = /^(vqt|invdo|po)-(.+)$/i.exec(word);
+    if (!m) return null;
+    var value = rstrip(m[2], ",.;:)");
+    var keep = /['’]$/.test(value);
+    value = rstrip(rstrip(value, "'’"), ",.;:)");
+    return value ? { kind: DOC_OF_PREFIX[m[1].toLowerCase()], number: value.toUpperCase(), keep: keep } : null;
+  }
+  function extractDocs(text) {
+    var words = [], docs = [];
+    text.split(/\s+/).filter(Boolean).forEach(function (w) {
+      var d = docToken(w);
+      if (!d) { words.push(w); return; }
+      docs.push(d);
+      if (d.keep) words.push(w.replace(/['’]/g, ""));
+    });
+    return { title: words.join(" "), docs: docs };
+  }
+
+  // ---------- chips ----------
+  var kind = "";  // "" = let the bot guess from the name
+  function renderTypes() {
+    var box = $("types"); box.innerHTML = "";
+    var list = [["", "Auto"]].concat(types.slice(0, 20).map(function (t) { return [t, t]; })).concat([["__own", "+ Own"]]);
+    var ownOpen = $("kind-own").style.display !== "none";
+    list.forEach(function (item) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = item[1];
+      if ((item[0] === "__own" && ownOpen) || (!ownOpen && item[0] === kind)) b.classList.add("on");
+      b.onclick = function () {
+        if (item[0] === "__own") { $("kind-own").style.display = "block"; $("kind-own").focus(); }
+        else { $("kind-own").style.display = "none"; $("kind-own").value = ""; kind = item[0]; }
+        renderTypes(); clearErr("kind");
+      };
+      box.appendChild(b);
+    });
+  }
+  function suggest(inputId, boxId, list) {
+    var input = $(inputId), box = $(boxId);
+    function draw() {
+      var q = input.value.trim().replace(/^[#@]/, "").toLowerCase();
+      box.innerHTML = "";
+      list.filter(function (v) { var l = String(v).toLowerCase(); return !q || (l.indexOf(q) >= 0 && l !== q); })
+        .slice(0, 8).forEach(function (v) {
+          var b = document.createElement("button");
+          b.type = "button"; b.className = "chip"; b.textContent = v;
+          b.onclick = function () { input.value = v; draw(); clearErr(inputId); updateWait(); };
+          box.appendChild(b);
+        });
+    }
+    input.addEventListener("input", function () { draw(); clearErr(inputId); updateWait(); });
+    draw();
+  }
+
+  // ---------- fields ----------
+  function updateTitle() {
+    var r = extractDocs($("title").value);
+    $("title-found").textContent = r.docs.length ? "📄 Found: " + r.docs.map(function (d) {
+      return DOC_TYPES[d.kind] + " " + d.number + (d.keep ? "" : " (taken out of the name)");
+    }).join(", ") : "";
+    clearErr("title");
+  }
+  function updateWait() {
+    var p = $("person").value.trim().replace(/^@/, "");
+    $("wait").disabled = !p;
+    if (!p) $("wait").checked = false;
+    $("wait-row").classList.toggle("off", !p);
+    $("wait-label").textContent = p ? "Already waiting on " + p : "Already waiting on this person";
+  }
+  function updateDue() {
+    var v = $("due").value, w = "";
+    if (v && holidays[v]) w = nice(v) + " is a public holiday (" + holidays[v] + "). Next workday: " + nice(nextWorkday(v)) + ".";
+    else if (v && weekday(v) >= 5) w = nice(v) + " is a " + DAYLONG[weekday(v)] + ". Real deadline " + nice(addDays(v, 4 - weekday(v))) + "?";
+    else if (v && v < TODAY) w = "That date has already passed.";
+    $("due-warn").textContent = w;
+    clearErr("due");
+  }
+  document.querySelectorAll("[data-due]").forEach(function (b) {
+    b.onclick = function () {
+      var c = b.getAttribute("data-due");
+      $("due").value = c === "today" ? TODAY : c === "next" ? nextWorkday(TODAY)
+        : c === "mon" ? addDays(TODAY, ((0 - weekday(TODAY) - 1 + 7) % 7) + 1) : "";
+      updateDue();
+    };
+  });
+  var priority = "normal";
+  document.querySelectorAll("[data-prio]").forEach(function (b) {
+    b.onclick = function () {
+      priority = b.getAttribute("data-prio");
+      document.querySelectorAll("[data-prio]").forEach(function (x) { x.classList.toggle("on", x === b); });
+    };
+  });
+  function addDocRow(k, n) {
+    var row = document.createElement("div"); row.className = "row";
+    var sel = document.createElement("select");
+    Object.keys(DOC_TYPES).forEach(function (key) {
+      var o = document.createElement("option"); o.value = key; o.textContent = DOC_TYPES[key]; sel.appendChild(o);
+    });
+    sel.value = k || "quotation";
+    var inp = document.createElement("input");
+    inp.type = "text"; inp.maxLength = 40; inp.placeholder = "Number, e.g. 0001"; inp.autocomplete = "off"; inp.value = n || "";
+    inp.setAttribute("autocapitalize", "characters");
+    inp.addEventListener("input", function () { clearErr("docs"); inp.classList.remove("bad"); });
+    var x = document.createElement("button"); x.type = "button"; x.className = "x"; x.textContent = "×";
+    x.setAttribute("aria-label", "Remove document");
+    x.onclick = function () { row.remove(); clearErr("docs"); };
+    row.appendChild(sel); row.appendChild(inp); row.appendChild(x);
+    $("docs").appendChild(row);
+    return inp;
+  }
+  $("add-doc").onclick = function () { addDocRow().focus(); };
+
+  // ---------- validation (the bot checks everything again) ----------
+  var TYPE_RE = /^[a-z][a-z0-9_-]{1,19}$/, WORD_RE = /^[^\s#@<>]{1,30}$/, DOC_RE = /^[A-Z0-9][A-Z0-9\/._-]{0,39}$/;
+  function setErr(id, text) {
+    var el = $(id + "-err"); if (el) { el.textContent = text; el.classList.add("show"); }
+    var inp = $(id); if (inp && inp.tagName === "INPUT") inp.classList.add("bad");
+  }
+  function clearErr(id) {
+    var el = $(id + "-err"); if (el) { el.textContent = ""; el.classList.remove("show"); }
+    var inp = $(id); if (inp && inp.tagName === "INPUT") inp.classList.remove("bad");
+    $("form-err").classList.remove("show");
+  }
+  function collect() {
+    var ok = true, first = null;
+    function fail(id, text) { setErr(id, text); ok = false; first = first || id; }
+    ["title", "kind", "customer", "person", "due", "docs"].forEach(clearErr);
+
+    var title = $("title").value.replace(/\s+/g, " ").trim();
+    if (!extractDocs(title).title) fail("title", "Task name is required.");
+    else if (title.length > 200) fail("title", "Up to 200 characters.");
+
+    var k = kind;
+    if ($("kind-own").style.display !== "none") {
+      k = $("kind-own").value.trim().toLowerCase().replace(/^type:/, "");
+      if (!TYPE_RE.test(k)) fail("kind", "One word starting with a letter, 2–20 characters, e.g. onsite.");
+    }
+    var customer = $("customer").value.trim().replace(/^#/, "");
+    if (customer && !WORD_RE.test(customer)) fail("customer", "One word, no spaces, up to 30 characters (e.g. boonplastic).");
+    var person = $("person").value.trim().replace(/^@/, "");
+    if (person && !WORD_RE.test(person)) fail("person", "One word, no spaces, up to 30 characters (e.g. jane).");
+
+    var due = $("due").value;
+    if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) fail("due", "That isn't a valid date.");
+
+    var docs = [];
+    $("docs").querySelectorAll(".row").forEach(function (row) {
+      var inp = row.querySelector("input"), n = inp.value.trim().toUpperCase().replace(/\s+/g, "");
+      if (!n) return;
+      if (!DOC_RE.test(n)) { inp.classList.add("bad"); fail("docs", "Numbers: letters, digits, - / . _ only, up to 40."); return; }
+      docs.push({ kind: row.querySelector("select").value, number: n });
+    });
+    if (docs.length > 10) fail("docs", "Up to 10 documents.");
+
+    var payload = { v: 1, title: title, kind: k, customer: customer, person: person, due: due,
+                    priority: priority, docs: docs, wait: !!(person && $("wait").checked) };
+    var json = JSON.stringify(payload);
+    if (new TextEncoder().encode(json).length > 4096) {
+      ok = false; $("form-err").textContent = "Too much text for one task. Shorten the name or documents."; $("form-err").classList.add("show");
+    }
+    if (!ok && first && $(first) && $(first).scrollIntoView) $(first).scrollIntoView({ behavior: "smooth", block: "center" });
+    return ok ? json : null;
+  }
+  function save() {
+    var json = collect();
+    if (!json) { if (inTelegram && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("error"); return; }
+    if (inTelegram) { tg.sendData(json); return; }  // Telegram closes the form and the bot replies with the task card
+    $("debug").textContent = "Not inside Telegram, so nothing was sent. This is what the bot would receive:\n" + json;
+  }
+
+  // ---------- start ----------
+  $("title").addEventListener("input", updateTitle);
+  $("kind-own").addEventListener("input", function () { clearErr("kind"); });
+  $("due").addEventListener("change", updateDue);
+  $("due").min = addDays(TODAY, -366);
+  renderTypes();
+  suggest("customer", "customer-chips", customers);
+  suggest("person", "person-chips", people);
+  updateWait();
+  if (inTelegram) {
+    document.documentElement.classList.add("tg");
+    tg.ready(); tg.expand();
+    if (tg.isVersionAtLeast && tg.isVersionAtLeast("7.7") && tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    tg.MainButton.setParams({ text: "Save task", is_visible: true, is_active: true });
+    tg.MainButton.onClick(save);
+  } else {
+    $("fallback").style.display = "block";
+    $("fallback").onclick = save;
+  }
+})();
+</script>
+</body>
+</html>
