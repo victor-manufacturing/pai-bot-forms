@@ -210,7 +210,9 @@
 
       <label class="label" for="c-phone" style="margin-top:12px">WhatsApp number</label>
       <input id="c-phone" type="tel" maxlength="25" autocomplete="off" placeholder="e.g. 012-345 6789">
-      <div class="note" id="c-phone-note">Leave empty for no WhatsApp button.</div>
+      <div class="note" id="c-phone-note">Leave empty for no WhatsApp button.<br>
+        📇 From your phone book? Close this, then in the chat tap 📎 → Contact and pick the person. The bot opens this form with
+        their name and number filled in.</div>
       <div id="c-phone-err" class="err"></div>
     </div>
     <div class="section">
@@ -649,7 +651,19 @@
       var hit = list.filter(function (c) { return c[0].toLowerCase() === k; })[0];
       $("c-key-note").textContent = hit ? "@" + hit[0] + " already exists: saving will update it." : "";
     });
-    load(null);
+    var pre = arr(CTX.pre);
+    if (pre.length === 3) {  // shared from the phone book in the chat
+      var same = list.filter(function (c) { return c[0].toLowerCase() === String(pre[0]).toLowerCase(); })[0];
+      if (same) {
+        load(same);
+        if (pre[2]) $("c-phone").value = pre[2];
+        $("c-key-note").textContent = "@" + same[0] + " is already saved: the number from your phone book is filled in. Save to update.";
+      } else {
+        load(null);
+        $("c-key").value = pre[0]; $("c-display").value = pre[1]; $("c-phone").value = pre[2];
+        $("c-mode").textContent = "New contact from your phone book";
+      }
+    } else load(null);
     return function collect() {
       var c = Checker();
       ["c-key", "c-display", "c-phone"].forEach(clearErr);
