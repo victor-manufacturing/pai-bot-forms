@@ -224,11 +224,13 @@
         <button type="button" class="chip" data-lang="ms">Bahasa Melayu</button>
       </div>
       <span class="label" style="margin-top:12px">They are</span>
-      <div class="seg two" id="c-kind">
-        <button type="button" class="chip" data-int="1">👥 Colleague</button>
-        <button type="button" class="chip on" data-int="0">🏢 Customer / supplier</button>
+      <div class="seg three" id="c-kind">
+        <button type="button" class="chip" data-role="colleague">👥 Colleague</button>
+        <button type="button" class="chip" data-role="supplier">🏭 Supplier</button>
+        <button type="button" class="chip" data-role="customer">🏢 Customer</button>
       </div>
-      <div class="note">Colleagues get chased sooner when you're waiting on them.</div>
+      <div class="note">Colleagues get chased sooner. A task with a supplier as its person gets the type supplier.</div>
+      <div id="c-kind-err" class="err"></div>
     </div>
   </div>
 
@@ -631,7 +633,7 @@
   // Contact
   // =====================================================================
   function contactView() {
-    var list = arr(CTX.c), editing = null, lang = "en", internal = false;
+    var list = arr(CTX.c), editing = null, lang = "en", role = "";
     function normPhone(t) {
       var d = String(t || "").replace(/\D/g, "");
       if (d.charAt(0) === "0") d = "6" + d; else if (d.charAt(0) === "1" && d.length >= 9 && d.length <= 10) d = "60" + d;
@@ -643,8 +645,10 @@
       $("c-key").value = c ? c[0] : ""; $("c-key").readOnly = !!c;
       $("c-key-note").textContent = c ? "To use a different short name, add it as a new contact." : "";
       $("c-display").value = c ? c[1] : ""; $("c-phone").value = c ? c[2] : "";
-      lang = c ? c[3] : "en"; internal = c ? !!c[4] : false;
-      pickSegment("c-lang", "data-lang", lang); pickSegment("c-kind", "data-int", internal ? "1" : "0");
+      lang = c ? c[3] : "en";
+      role = c ? (c[5] && c[5] !== "unknown" ? c[5] : (c[4] ? "colleague" : "")) : "";
+      pickSegment("c-lang", "data-lang", lang); pickSegment("c-kind", "data-role", role);
+      clearErr("c-kind");
       ["c-key", "c-display", "c-phone"].forEach(clearErr);
       draw();
     }
@@ -660,7 +664,7 @@
       });
     }
     segment("c-lang", "data-lang", function (v) { lang = v; });
-    segment("c-kind", "data-int", function (v) { internal = v === "1"; });
+    segment("c-kind", "data-role", function (v) { role = v; clearErr("c-kind"); });
     ["c-key", "c-display", "c-phone"].forEach(function (id) { $(id).addEventListener("input", function () { clearErr(id); }); });
     $("c-key").addEventListener("input", function () {
       var k = $("c-key").value.trim().replace(/^@/, "").toLowerCase();
@@ -689,8 +693,9 @@
       if (display.length > 60) c.fail("c-display", "Up to 60 characters.");
       var phone = $("c-phone").value.trim();
       if (phone && !normPhone(phone)) c.fail("c-phone", "That doesn't look like a phone number, e.g. 012-345 6789.");
+      if (!role) c.fail("c-kind", "Pick colleague, supplier or customer.");
       if (!c.done()) return null;
-      return { v: 1, m: "contact", key: key, display: display || key, phone: phone, lang: lang, internal: internal };
+      return { v: 1, m: "contact", key: key, display: display || key, phone: phone, lang: lang, role: role };
     };
   }
 
